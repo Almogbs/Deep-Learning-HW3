@@ -92,11 +92,14 @@ class Trainer(abc.ABC):
             #  - Save losses and accuracies in the lists above.
             #  - Implement early stopping. This is a very useful and
             #    simple regularization technique that is highly recommended.
-            # ====== YOUR CODE: ======
             
-            raise NotImplementedError()
-
-            # ========================
+            train_result = self.train_epoch(dl_train, **kw)
+            train_loss.append(train_result.loss / len(dl_train.dataset))
+            train_loss.append(train_result.accuracy)
+            
+            test_result = self.test_epoch(dl_test, **kw)
+            test_loss.append(test_result.loss / len(dl_test.dataset))
+            test_loss.append(test_result.accuracy)
 
             # Save model checkpoint if requested
             if save_checkpoint and checkpoint_filename is not None:
@@ -221,19 +224,14 @@ class RNNTrainer(Trainer):
         super().__init__(model, loss_fn, optimizer, device)
 
     def train_epoch(self, dl_train: DataLoader, **kw):
-        # TODO: Implement modifications to the base method, if needed.
-        # ====== YOUR CODE: ======
-        
+        # no change needed
         self.hidden_state = None    
-            
-        # ========================
         return super().train_epoch(dl_train, **kw)
 
     def test_epoch(self, dl_test: DataLoader, **kw):
-        # TODO: Implement modifications to the base method, if needed.
-        # ====== YOUR CODE: ======
+        # no change needed
         self.hidden_state = None   
-        # ========================
+        
         return super().test_epoch(dl_test, **kw)
 
     def train_batch(self, batch) -> BatchResult:
@@ -249,10 +247,21 @@ class RNNTrainer(Trainer):
         #  - Backward pass: truncated back-propagation through time
         #  - Update params
         #  - Calculate number of correct char predictions
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
-
+        
+        current_output, self.hidden_state = self.model(x, self.hidden_state) #forward pass
+        self.optimizer.zero_grad()
+        #  - Calculate total loss over sequence
+        output  = current_output.view(-1, current_output.shape[2])
+        loss = self.loss_fn(output, y)
+        #backward pass
+        loss.backward()
+        #  - Update params
+        self.optimizer.step()
+        #  - Calculate number of correct char predictions
+        self.hidden_state = self.hidden_state.detach()
+        result = torch.argmax(output, 1)
+        num_correct = torch.eq(y, result).sum().item()
+        
         # Note: scaling num_correct by seq_len because each sample has seq_len
         # different predictions.
         return BatchResult(loss.item(), num_correct.item() / seq_len)
@@ -269,9 +278,15 @@ class RNNTrainer(Trainer):
             #  - Forward pass
             #  - Loss calculation
             #  - Calculate number of correct predictions
-            # ====== YOUR CODE: ======
-            raise NotImplementedError()
-            # ========================
+            
+            #  - Forward pass
+            current_output, self.hidden_state = self.model(x, self.hidden_state)
+            #  - Loss calculation
+            output = current_output.view(-1, current_output.shape[2])
+            loss = self.loss_fn(output, y)
+            #  - Calculate number of correct predictions
+            result = torch.argmax(output, 1)
+            num_correct = torch.eq(y, result).sum().item()
 
         return BatchResult(loss.item(), num_correct.item() / seq_len)
 
