@@ -16,11 +16,10 @@ def char_maps(text: str):
         integer from zero to the number of unique chars in the text.
         - idx_to_char, a mapping from an index to the character
         represented by it. The reverse of the above map.
-
     """
     chars = sorted(list(set(text)))
     char_to_idx = {d: idx for idx ,d in enumerate(chars)}
-    idx_to_char = {idx: d for idx ,d in enumerate(chars)}
+    idx_to_char = {idx: d for d, idx in char_to_idx.items()}
 
     return char_to_idx, idx_to_char
 
@@ -34,11 +33,12 @@ def remove_chars(text: str, chars_to_remove):
         - text_clean: the text after removing the chars.
         - n_removed: Number of chars removed.
     """
-    text_clean = str(text)
-    text_clean = [i for i in text_clean if i not in chars_to_remove]
-    
-    return str(text_clean), (len(text) - len(text_clean))
+    txt = str(text)
+    for char in chars_to_remove:
+        txt = txt.replace(char, '')
 
+    return txt, (len(text) - len(txt))
+    
 
 def chars_to_onehot(text: str, char_to_idx: dict) -> Tensor:
     """
@@ -74,8 +74,7 @@ def onehot_to_chars(embedded_text: Tensor, idx_to_char: dict) -> str:
     :return: A string containing the text sequence represented by the
     embedding.
     """
-    N, D = embedded_text.shape
-    sequence = ""
+    sequence = ''
 
     for row in embedded_text:
         index = torch.argmax(row).item()
@@ -105,12 +104,11 @@ def chars_to_labelled_samples(text: str, char_to_idx: dict, seq_len: int, device
     S = seq_len
 
     embed = chars_to_onehot(text[:N*S + 1], char_to_idx)
-    samples = torch.stack(torch.split(embed[:-1], S)).to(device)
-
-    labels_raw = torch.stack(torch.split(embed[1:], S)).to(device)
+    samples = torch.stack(torch.split(embed[:-1], S))
+    labels_raw = torch.stack(torch.split(embed[1:], S))
     _, labels = torch.max(labels_raw, dim=2)
     
-    return samples, labels.to(device)
+    return samples, labels
 
 
 def hot_softmax(y, dim=0, temperature=1.0):
@@ -143,22 +141,21 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     with chars predicted by the model, with a total length of n_chars.
     """
     assert len(start_sequence) < n_chars
+
     device = next(model.parameters()).device
     char_to_idx, idx_to_char = char_maps
     out_text = start_sequence
+    hs = None
 
     with torch.no_grad():
-        chars_to_iterate = (n_chars - len(start_sequence))
-        h_s = None
-        for i in range(chars_to_iterate):
-            one_hot = chars_to_onehot(start_sequence, char_to_idx)
-            currernt_input = torch.unsqueeze(one_hot, 0)
-            layer_output, h_s = model(currernt_input.to(device), h_s)
-            new_char_scores = layer_output[0, -1, :]
-            num_samples = 1
-            next_char = idx_to_char[torch.multinomial(hot_softmax(new_char_scores, temperature=T), num_samples)]
-            out_text += next_char
-            start_sequence = next_char
+        chars = n_chars - len(start_sequence)
+        seq = start_sequence
+        for i in range(chars):
+            input = chars_to_onehot(seq, char_to_idx).float().unsqueeze(0).to(device)
+            preds, hs = model(input, hs)
+            y = torch.multinomial(hot_softmax(preds[0][-1], -1, T), 1)
+            out_text += idx_to_char[y.item()]
+            seq = idx_to_char[y.item()]
 
     return out_text
 
@@ -223,7 +220,7 @@ class MultilayerGRU(nn.Module):
             Whr = nn.Linear(h_dim, h_dim, bias=True)
             Wxg = nn.Linear(in_dim, h_dim, bias=False)
             Whg = nn.Linear(h_dim, h_dim, bias=True)
-            dol = nn.Dropout2d(dropout)
+            dol = nn.Dropout(dropout)
 
             # Save them per-layer in the layer_params list
             self.layer_params.append((Wxz, Whz, Wxr, Whr, Wxg, Whg, dol))
@@ -283,8 +280,8 @@ class MultilayerGRU(nn.Module):
                 g = self.tanh(Wxg(x) + Whg(r * prev_h))
                 h = z * prev_h + (1 - z) * g
                 x = dol(h)
-                layer_states[i] = h
-    
+                layer_states[i] = h.clone()
+
             out.append(self.layer_params[-1](x))
 
         return torch.stack(out, dim=1), torch.stack(layer_states, dim=1)

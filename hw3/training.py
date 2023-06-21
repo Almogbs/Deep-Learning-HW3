@@ -85,21 +85,14 @@ class Trainer(abc.ABC):
             if epoch % print_every == 0 or epoch == num_epochs - 1:
                 verbose = True
             self._print(f"--- EPOCH {epoch+1}/{num_epochs} ---", verbose)
-
-            # TODO:
-            #  Train & evaluate for one epoch
-            #  - Use the train/test_epoch methods.
-            #  - Save losses and accuracies in the lists above.
-            #  - Implement early stopping. This is a very useful and
-            #    simple regularization technique that is highly recommended.
             
             train_result = self.train_epoch(dl_train, **kw)
-            train_loss.append(train_result.loss / len(dl_train.dataset))
-            train_loss.append(train_result.accuracy)
+            train_loss.append(sum(train_result.losses) / len(train_result.losses))
+            train_acc.append(train_result.accuracy)
             
             test_result = self.test_epoch(dl_test, **kw)
-            test_loss.append(test_result.loss / len(dl_test.dataset))
-            test_loss.append(test_result.accuracy)
+            test_loss.append(sum(test_result.losses) / len(test_result.losses))
+            test_acc.append(test_result.accuracy)
 
             # Save model checkpoint if requested
             if save_checkpoint and checkpoint_filename is not None:
@@ -231,7 +224,6 @@ class RNNTrainer(Trainer):
     def test_epoch(self, dl_test: DataLoader, **kw):
         # no change needed
         self.hidden_state = None   
-        
         return super().test_epoch(dl_test, **kw)
 
     def train_batch(self, batch) -> BatchResult:
@@ -240,30 +232,16 @@ class RNNTrainer(Trainer):
         y = y.to(self.device, dtype=torch.long)  # (B,S)
         seq_len = y.shape[1]
 
-        # TODO:
-        #  Train the RNN model on one batch of data.
-        #  - Forward pass
-        #  - Calculate total loss over sequence
-        #  - Backward pass: truncated back-propagation through time
-        #  - Update params
-        #  - Calculate number of correct char predictions
-        
-        current_output, self.hidden_state = self.model(x, self.hidden_state) #forward pass
+        out_seq, out_hidden = self.model(x, self.hidden_state)
+
+        self.hidden_state = out_hidden.detach()
+
+        loss = self.loss_fn(out_seq.transpose(1,2), y)
         self.optimizer.zero_grad()
-        #  - Calculate total loss over sequence
-        output  = current_output.view(-1, current_output.shape[2])
-        loss = self.loss_fn(output, y)
-        #backward pass
         loss.backward()
-        #  - Update params
         self.optimizer.step()
-        #  - Calculate number of correct char predictions
-        self.hidden_state = self.hidden_state.detach()
-        result = torch.argmax(output, 1)
-        num_correct = torch.eq(y, result).sum().item()
-        
-        # Note: scaling num_correct by seq_len because each sample has seq_len
-        # different predictions.
+        num_correct = (out_seq.argmax(dim=2) == y).sum()
+
         return BatchResult(loss.item(), num_correct.item() / seq_len)
 
     def test_batch(self, batch) -> BatchResult:
@@ -273,20 +251,10 @@ class RNNTrainer(Trainer):
         seq_len = y.shape[1]
 
         with torch.no_grad():
-            # TODO:
-            #  Evaluate the RNN model on one batch of data.
-            #  - Forward pass
-            #  - Loss calculation
-            #  - Calculate number of correct predictions
-            
-            #  - Forward pass
-            current_output, self.hidden_state = self.model(x, self.hidden_state)
-            #  - Loss calculation
-            output = current_output.view(-1, current_output.shape[2])
-            loss = self.loss_fn(output, y)
-            #  - Calculate number of correct predictions
-            result = torch.argmax(output, 1)
-            num_correct = torch.eq(y, result).sum().item()
+            out_seq, out_hidden = self.model(x, self.hidden_state)
+            self.hidden_state = out_hidden.detach()
+            loss = self.loss_fn(out_seq.transpose(1,2), y)
+            num_correct = (out_seq.argmax(dim=2) == y).sum()
 
         return BatchResult(loss.item(), num_correct.item() / seq_len)
 

@@ -22,38 +22,44 @@ def part1_rnn_hyperparams():
     )
     # TODO: Set the hyperparameters to train the model.
     # ====== YOUR CODE: ======
-    
-    # ========================
+    hypers['batch_size']=512
+    hypers['seq_len']=64
+    hypers['h_dim']=128
+    hypers['n_layers']=3
+    hypers['dropout']=0.2
+    hypers['learn_rate']=0.003
+    hypers['lr_sched_factor']=0.01
+    hypers['lr_sched_patience']=15
     return hypers
 
 
 def part1_generation_params():
-    start_seq = ""
+    start_seq = "for whom "
     temperature = 0.0001
-    # TODO: Tweak the parameters to generate a literary masterpiece.
-    # ====== YOUR CODE: ======
-    
-    # ========================
     return start_seq, temperature
 
 
 part1_q1 = r"""
-**Your answer:**
+We aim to divide the corpus while training for multiple reasons. By splitting the corpus into sequences, we can load manageable-sized examples into memory. This approach prevents the entire corpus from occupying all available memory. Another reason is we intend for the model to exclusively utilize recent data for predicting future characters. This allows us to minimize the impact of frequently occurring words from earlier in the corpus on our predictions.
 
 """
 
 part1_q2 = r"""
-**Your answer:**
+The generation of text that shows longer memory than the sequence length is made possible by utilizing memory from many sources, including the previously generated text and the hidden state of the model. The final output is not restricted only by the maximum length of the preceding sequence. This ability allows the hidden state to hold more information than the sequence length, resulting in the generation of text that passes the maximum length.
 
 """
 
 part1_q3 = r"""
-**Your answer:**
+Since each batch is trained with consideration of the of before, the order of the training batch matters. If we shuffle the training batch, the model will not be able to learn the relationship between the characters in the corpus as it is presented.
 
 """
 
 part1_q4 = r"""
-**Your answer:**
+1. Lowering the temperature value affects the variability of the distribution for the next letter. By reducing the temperature to a value lower than 1, we can "highlight" some of the possible prediction options. This helps prevent the repetitive selection of the same letters throughout the prediction, resulting in a less deterministic model.
+
+2. When the temperature is set to a high value, the distribution of outputs becomes highly variable. No single output stands out more than others, and the outputs are distributed uniformly.
+
+3. When the temperature is set to a los value, we get adecrease in variability, resulting in a distribution with reduced variance. In this case, outputs with higher scores get higher chance to be predicted.
 
 
 """

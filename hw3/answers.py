@@ -20,26 +20,22 @@ def part1_rnn_hyperparams():
         lr_sched_factor=0.0,
         lr_sched_patience=0,
     )
-    hypers = dict(
-        batch_size=256,
-        seq_len=64,
-        h_dim=512,
-        n_layers=3,
-        dropout=0.25,
-        learn_rate=0.003,
-        lr_sched_factor=0.3,
-        lr_sched_patience=5,
-    )
+    # TODO: Set the hyperparameters to train the model.
+    # ====== YOUR CODE: ======
+    hypers['batch_size']=512
+    hypers['seq_len']=64
+    hypers['h_dim']=128
+    hypers['n_layers']=3
+    hypers['dropout']=0.2
+    hypers['learn_rate']=0.003
+    hypers['lr_sched_factor']=0.01
+    hypers['lr_sched_patience']=15
     return hypers
 
 
 def part1_generation_params():
-    start_seq = ""
+    start_seq = "for whom "
     temperature = 0.0001
-    # TODO: Tweak the parameters to generate a literary masterpiece.
-    # ====== YOUR CODE: ======
-    
-    # ========================
     return start_seq, temperature
 
 
