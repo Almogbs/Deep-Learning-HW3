@@ -22,20 +22,21 @@ def part1_rnn_hyperparams():
     )
     # TODO: Set the hyperparameters to train the model.
     # ====== YOUR CODE: ======
-    hypers['batch_size']=512
-    hypers['seq_len']=64
-    hypers['h_dim']=128
-    hypers['n_layers']=3
-    hypers['dropout']=0.2
-    hypers['learn_rate']=0.003
-    hypers['lr_sched_factor']=0.01
-    hypers['lr_sched_patience']=15
+
+    hypers['batch_size'] = 256
+    hypers['seq_len'] = 128
+    hypers['h_dim'] = 128
+    hypers['n_layers'] = 2
+    hypers['dropout'] = 0.2
+    hypers['learn_rate'] = 3e-3
+    hypers['lr_sched_factor'] = 1e-1
+    hypers['lr_sched_patience'] = 10
     return hypers
 
 
 def part1_generation_params():
-    start_seq = "for whom "
-    temperature = 0.0001
+    start_seq = "Yo William man, how u doin? "
+    temperature = 0.5
     return start_seq, temperature
 
 

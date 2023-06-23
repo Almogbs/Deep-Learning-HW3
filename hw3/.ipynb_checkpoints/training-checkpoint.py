@@ -233,11 +233,9 @@ class RNNTrainer(Trainer):
         seq_len = y.shape[1]
 
         out_seq, out_hidden = self.model(x, self.hidden_state)
-
-        self.hidden_state = out_hidden.detach()
-
-        loss = self.loss_fn(out_seq.transpose(1,2), y)
         self.optimizer.zero_grad()
+        self.hidden_state = out_hidden.detach()
+        loss = self.loss_fn(out_seq.transpose(1,2), y)
         loss.backward()
         self.optimizer.step()
         num_correct = (out_seq.argmax(dim=2) == y).sum()
@@ -253,7 +251,6 @@ class RNNTrainer(Trainer):
         with torch.no_grad():
             out_seq, out_hidden = self.model(x, self.hidden_state)
             self.hidden_state = out_hidden.detach()
-
             loss = self.loss_fn(out_seq.transpose(1,2), y)
             num_correct = (out_seq.argmax(dim=2) == y).sum()
 

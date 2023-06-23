@@ -120,10 +120,9 @@ def hot_softmax(y, dim=0, temperature=1.0):
     :param temperature: Temperature.
     :return: Softmax computed with the temperature parameter.
     """
-    after_scaling = y / temperature
-    result = torch.softmax(after_scaling, dim=dim)
-    
-    return result
+    sm = nn.Softmax(dim=dim)
+
+    return sm(y / temperature)
 
 
 def generate_from_model(model, start_sequence, n_chars, char_maps, T):
@@ -179,7 +178,7 @@ class SequenceBatchSampler(torch.utils.data.Sampler):
     def __iter__(self) -> Iterator[int]:
         n_batches = len(self.dataset) // self.batch_size
         n_samples_complete = n_batches * self.batch_size
-        idx = list(range(n_samples_complete))
+        idx = torch.arange(n_samples_complete).reshape((self.batch_size, -1)).transpose(0, 1).flatten()
 
         return iter(idx)
 
@@ -209,8 +208,9 @@ class MultilayerGRU(nn.Module):
         self.h_dim = h_dim
         self.n_layers = n_layers
         self.layer_params = []
-        self.sm = torch.sigmoid
-        self.tanh = torch.tanh
+        self.sm = nn.Sigmoid()
+        self.tanh = nn.Tanh()
+        self.dol = nn.Dropout(dropout)
 
         for idx in range(self.n_layers):
             # Create the parameters of the model for all layers
@@ -220,10 +220,9 @@ class MultilayerGRU(nn.Module):
             Whr = nn.Linear(h_dim, h_dim, bias=True)
             Wxg = nn.Linear(in_dim, h_dim, bias=False)
             Whg = nn.Linear(h_dim, h_dim, bias=True)
-            dol = nn.Dropout(dropout)
 
             # Save them per-layer in the layer_params list
-            self.layer_params.append((Wxz, Whz, Wxr, Whr, Wxg, Whg, dol))
+            self.layer_params.append((Wxz, Whz, Wxr, Whr, Wxg, Whg))
 
             # Register the created parameters
             self.add_module(f'l{idx}-Wxz:', Wxz)
@@ -232,7 +231,6 @@ class MultilayerGRU(nn.Module):
             self.add_module(f'l{idx}-Whr:', Whr)
             self.add_module(f'l{idx}-Wxg:', Wxg)
             self.add_module(f'l{idx}-Whg:', Whg)
-            self.add_module(f'l{idx}-Dropout:', dol)
 
             # Update the inner dim
             in_dim = h_dim
@@ -273,13 +271,13 @@ class MultilayerGRU(nn.Module):
         for t in range(seq_len):
             x = input[:, t, :]
             for i, layer in enumerate(self.layer_params[:-1]):
-                Wxz, Whz, Wxr, Whr, Wxg, Whg, dol = layer
+                Wxz, Whz, Wxr, Whr, Wxg, Whg = layer
                 prev_h = layer_states[i]
                 z = self.sm(Wxz(x) + Whz(prev_h))
                 r = self.sm(Wxr(x) + Whr(prev_h))
                 g = self.tanh(Wxg(x) + Whg(r * prev_h))
                 h = z * prev_h + (1 - z) * g
-                x = dol(h)
+                x = self.dol(h)
                 layer_states[i] = h.clone()
 
             out.append(self.layer_params[-1](x))
