@@ -7,22 +7,36 @@ class EncoderCNN(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
 
-        modules = []
+        kernel_size = (5, 5)
+        stride = (2, 2)
+        padding = (2, 2)
 
-        # TODO:
-        #  Implement a CNN. Save the layers in the modules list.
-        #  The input shape is an image batch: (N, in_channels, H_in, W_in).
-        #  The output shape should be (N, out_channels, H_out, W_out).
-        #  You can assume H_in, W_in >= 64.
-        #  Architecture is up to you, but it's recommended to use at
-        #  least 3 conv layers. You can use any Conv layer parameters,
-        #  use pooling or only strides, use any activation functions,
-        #  use BN or Dropout, etc.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        activation_layer = nn.ReLU()
+        modules = []
+        input_channels = [in_channels, 32, 64, 128]
+        output_channels = [32, 64, 128, out_channels]
+
+        for in_channels, out_channels in zip(input_channels[:-1], output_channels[:-1]):
+            modules.append(nn.Conv2d(in_channels=in_channels,
+                                     out_channels=out_channels,
+                                     kernel_size=kernel_size,
+                                     padding=padding,
+                                     stride=stride
+                                    )
+            )
+            modules.append(nn.BatchNorm2d(num_features=out_channels))
+            modules.append(activation_layer)
+
+        modules.append(nn.Conv2d(in_channels=input_channels[-1],
+                                 out_channels=output_channels[-1],
+                                 kernel_size=kernel_size,
+                                 padding=padding
+                                )
+        )
+
         self.cnn = nn.Sequential(*modules)
 
+    
     def forward(self, x):
         return self.cnn(x)
 
@@ -31,19 +45,35 @@ class DecoderCNN(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
 
-        modules = []
+        kernel_size = (5, 5)
+        stride = (2, 2)
+        padding = (2, 2)
+        output_padding = (1, 1)
 
-        # TODO:
-        #  Implement the "mirror" CNN of the encoder.
-        #  For example, instead of Conv layers use transposed convolutions,
-        #  instead of pooling do unpooling (if relevant) and so on.
-        #  The architecture does not have to exactly mirror the encoder
-        #  (although you can), however the important thing is that the
-        #  output should be a batch of images, with same dimensions as the
-        #  inputs to the Encoder were.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        activation_layer = nn.ReLU()
+        modules = []
+        input_channels = [128, 64, 32, out_channels]
+        output_channels = [in_channels, 128, 64, 32]
+
+        modules.append(nn.ConvTranspose2d(in_channels=output_channels[0],
+                                          out_channels=input_channels[0],
+                                          kernel_size=kernel_size,
+                                          padding=padding
+                                         )
+        )
+
+        for out_channels, in_channels in zip(input_channels[1:], output_channels[1:]):
+            modules.append(activation_layer)
+            modules.append(nn.BatchNorm2d(num_features=in_channels))
+            modules.append(nn.ConvTranspose2d(in_channels=in_channels,
+                                              out_channels=out_channels,
+                                              kernel_size=kernel_size,
+                                              padding=padding,
+                                              stride=stride,
+                                              output_padding=output_padding
+                                             )
+            )
+
         self.cnn = nn.Sequential(*modules)
 
     def forward(self, h):
@@ -57,7 +87,7 @@ class VAE(nn.Module):
         :param features_encoder: Instance of an encoder the extracts features
         from an input.
         :param features_decoder: Instance of a decoder that reconstructs an
-        input from it's features.
+        input from i t's features.
         :param in_size: The size of one input (without batch dimension).
         :param z_dim: The latent space dimension.
         """
@@ -67,11 +97,9 @@ class VAE(nn.Module):
         self.z_dim = z_dim
 
         self.features_shape, n_features = self._check_features(in_size)
-
-        # TODO: Add more layers as needed for encode() and decode().
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        self.mean_fc = nn.Linear(n_features, z_dim, bias=True)
+        self.var_fc = nn.Linear(n_features, z_dim, bias=True)
+        self.latent_fc = nn.Linear(z_dim, n_features, bias=True)
 
     def _check_features(self, in_size):
         device = next(self.parameters()).device
@@ -85,46 +113,28 @@ class VAE(nn.Module):
             return h.shape[1:], torch.numel(h) // h.shape[0]
 
     def encode(self, x):
-        # TODO:
-        #  Sample a latent vector z given an input x from the posterior q(Z|x).
-        #  1. Use the features extracted from the input to obtain mu and
-        #     log_sigma2 (mean and log variance) of q(Z|x).
-        #  2. Apply the reparametrization trick to obtain z.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        h = self.features_encoder(x).reshape(x.shape[0], -1)
+        mu, log_sigma2 = self.mean_fc(h), self.var_fc(h)
+        
+        std = torch.exp(0.5 * log_sigma2)
+        eps = torch.randn_like(std)
+        z = mu + eps * std
 
         return z, mu, log_sigma2
 
     def decode(self, z):
-        # TODO:
-        #  Convert a latent vector back into a reconstructed input.
-        #  1. Convert latent z to features h with a linear layer.
-        #  2. Apply features decoder.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
-
-        # Scale to [-1, 1] (same dynamic range as original images).
+        h = self.latent_fc(z).reshape(-1, *self.features_shape)
+        x_rec = self.features_decoder(h)
+        
         return torch.tanh(x_rec)
 
     def sample(self, n):
         samples = []
         device = next(self.parameters()).device
         with torch.no_grad():
-            # TODO:
-            #  Sample from the model. Generate n latent space samples and
-            #  return their reconstructions.
-            #  Notes:
-            #  - Remember that this means using the model for INFERENCE.
-            #  - We'll ignore the sigma2 parameter here:
-            #    Instead of sampling from N(psi(z), sigma2 I), we'll just take
-            #    the mean, i.e. psi(z).
-            # ====== YOUR CODE: ======
-            raise NotImplementedError()
-            # ========================
+            input = torch.randn((n, self.z_dim), device=device)
+            samples = self.decode(input)
 
-        # Detach and move to CPU for display purposes
         samples = [s.detach().cpu() for s in samples]
         return samples
 
@@ -147,14 +157,21 @@ def vae_loss(x, xr, z_mu, z_log_sigma2, x_sigma2):
         - The KL divergence loss term
     all three are scalars, averaged over the batch dimension.
     """
-    loss, data_loss, kldiv_loss = None, None, None
-    # TODO:
-    #  Implement the VAE pointwise loss calculation.
-    #  Remember:
-    #  1. The covariance matrix of the posterior is diagonal.
-    #  2. You need to average over the batch dimension.
-    # ====== YOUR CODE: ======
-    raise NotImplementedError()
-    # ========================
+    N, C, H, W = x.size()
+    d_x = C * H * W
+    d_z = z_mu.shape[1]
 
-    return loss, data_loss, kldiv_loss
+    inner_data_loss = x.reshape(x.shape[0], -1) - xr.reshape(xr.shape[0], -1)
+    data_loss = torch.mean(torch.sum(inner_data_loss ** 2, dim=1)) 
+    data_loss /= (x_sigma2 * d_x)
+    
+    kldiv_loss_1 = torch.sum(torch.exp(z_log_sigma2), dim=1)
+    kldiv_loss_2 = torch.sum(z_mu ** 2, dim=1)
+    kldiv_loss_3 = d_z
+    kldiv_loss_4 = torch.sum(z_log_sigma2, dim=1)
+    kldiv_loss = torch.mean(kldiv_loss_1 + kldiv_loss_2 - (kldiv_loss_3 + kldiv_loss_4))
+
+    return kldiv_loss + data_loss, data_loss, kldiv_loss
+
+
+

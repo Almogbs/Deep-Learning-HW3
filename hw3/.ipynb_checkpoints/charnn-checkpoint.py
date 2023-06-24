@@ -152,7 +152,7 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
         for i in range(chars):
             input = chars_to_onehot(seq, char_to_idx).float().unsqueeze(0).to(device)
             preds, hs = model(input, hs)
-            y = torch.multinomial(hot_softmax(preds[0][-1], -1, T), 1)
+            y = torch.multinomial(hot_softmax(preds[0][-1], dim=-1, temperature=T), 1)
             out_text += idx_to_char[y.item()]
             seq = idx_to_char[y.item()]
 

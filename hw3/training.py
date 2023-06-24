@@ -94,6 +94,16 @@ class Trainer(abc.ABC):
             test_loss.append(sum(test_result.losses) / len(test_result.losses))
             test_acc.append(test_result.accuracy)
 
+            if best_acc is None or test_result.accuracy > best_acc:
+                save_checkpoint = True
+                best_acc = test_result.accuracy
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+
+            if epochs_without_improvement == early_stopping:
+                break
+    
             # Save model checkpoint if requested
             if save_checkpoint and checkpoint_filename is not None:
                 saved_state = dict(
@@ -261,10 +271,12 @@ class VAETrainer(Trainer):
     def train_batch(self, batch) -> BatchResult:
         x, _ = batch
         x = x.to(self.device)  # Image batch (N,C,H,W)
-        # TODO: Train a VAE on one batch.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        z, mu, log = self.model(x)
+        self.optimizer.zero_grad()
+        loss, data_loss, kldiv_loss = self.loss_fn(x, z, mu, log)
+        
+        loss.backward()
+        self.optimizer.step()
 
         return BatchResult(loss.item(), 1 / data_loss.item())
 
@@ -273,10 +285,8 @@ class VAETrainer(Trainer):
         x = x.to(self.device)  # Image batch (N,C,H,W)
 
         with torch.no_grad():
-            # TODO: Evaluate a VAE on one batch.
-            # ====== YOUR CODE: ======
-            raise NotImplementedError()    
-            # ========================
+            z, mu, log = self.model(x)
+            loss, data_loss, kldiv_loss = self.loss_fn(x, z, mu, log)
 
         return BatchResult(loss.item(), 1 / data_loss.item())
 
