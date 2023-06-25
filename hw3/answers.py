@@ -21,20 +21,22 @@ def part1_rnn_hyperparams():
         lr_sched_patience=0,
     )
 
-    hypers['batch_size'] = 256
+    hypers['batch_size'] = 512
     hypers['seq_len'] = 64
-    hypers['h_dim'] = 256
+    hypers['h_dim'] = 128
     hypers['n_layers'] = 3
     hypers['dropout'] = 0.1
-    hypers['learn_rate'] = 5e-3
+    hypers['learn_rate'] = 1e-3
     hypers['lr_sched_factor'] = 1e-1
-    hypers['lr_sched_patience'] = 8
+    hypers['lr_sched_patience'] = 5
+
     return hypers
 
 
 def part1_generation_params():
     start_seq = "Yo William man, how u doin? "
     temperature = 0.5
+
     return start_seq, temperature
 
 
@@ -86,28 +88,36 @@ def part2_vae_hyperparams():
 
 
 part2_q1 = r"""
-**Your answer:**
-
-
+Your answer:
+When sigma is set to a high value, the loss gives more importance to the kldiv loss. This gives a smoother representation of the data. As a result, the generated samples become more similar to each other.
+When sigma is set to a small value, the loss depends more on the difference between the original and reconstructed image. This means the model will try to keep the details of the input image as accurate as possible.
+Thus, sigma is responsible for regulating the VAE model, when a large-> lowers the generated images diversity, adn a smaller sigma-> many different looking images but less organized or meaningful
 """
 
 part2_q2 = r"""
-**Your answer:**
+Your answer:
+1. 
+The reconstruction loss aims to generate images that closely resemble the original input images. On the other hand, the KL divergence loss aims to check that the two images that are close to each other in the latent space will result in two similar reconstructed images. This means a smooth latent space.
 
+
+2.
+The KL loss term has a direct influence on the variance of the latent space. When the KL loss is larger, it leads to a higher variance in the latent space. This means that different latent vectors can be more spread out and have a wider range of values.
+On the other hand, a smaller KL loss results in a reduced variance of the latent space-> the latent vectors are more concentrated and have less variability in their values.
+
+3.
+We can achive better generalization by ensuring that similar input images result in similar reconstructed outputs. This allows the model to capture and preserve important features or patterns present in the data, leading to more accurate reconstructions.
+By smoothly transitioning between different regions of the latent space, the model can generate meaningful and diverse samples.
 
 """
 
 part2_q3 = r"""
-**Your answer:**
-
-
-
+Your answer:
+The VAE model aims to generate images that closely resemble real data. However, the space of possible options for an image of size 3x64x64 is incredibly big. By maximizing the evidence distribution, P(X), and by that the likelihood, we prioritize generating images that are closer to the dataset distribution. This will increase the chances of producing high-quality, realistic images that resemble the characteristics of the training data.
 """
 
 part2_q4 = r"""
-**Your answer:**
-
-
+Your answer:
+we model the log of the latent-space variance corresponding to an input, instead of directly modelling this variance because the need for the variance to be a positive value. By using the log, we make sure that the resulting variance remains positive when applying the exponential function. 
 """
 
 # ==============
