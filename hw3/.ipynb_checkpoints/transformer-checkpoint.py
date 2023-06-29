@@ -18,27 +18,46 @@ def sliding_window_attention(q, k, v, window_size, padding_mask=None):
     :return values - the output values. #[Batch, SeqLen, Dims] or [Batch, num_heads, SeqLen, Dims]
     :return attention - the attention weights. #[Batch, SeqLen, SeqLen] or [Batch, num_heads, SeqLen, SeqLen]
     '''
-    assert window_size%2 == 0, "window size must be an even number"
+    assert window_size % 2 == 0, "window size must be an even number"
     seq_len = q.shape[-2]
     embed_dim = q.shape[-1]
-    batch_size = q.shape[0] 
+    batch_size = q.shape[0]
+    num_heads = q.shape[1]
+    minus_inf = -9e15
+    w = window_size // 2
 
-    values, attention = None, None
+    if len(q.shape) > 3:
+        k = k.reshape((batch_size * num_heads, seq_len, embed_dim))
+        q = q.reshape((batch_size * num_heads, seq_len, embed_dim))
+    else:
+        num_heads = 1
+    
+    b = torch.full((batch_size * num_heads, seq_len, seq_len), minus_inf).to(q.device)
 
-    # TODO:
-    #  Compute the sliding window attention.
-    # NOTE: We will not test your implementation for efficiency, but you are required to follow these two rules:
-    # 1) Implement the function without using for loops.
-    # 2) DON'T compute all dot products and then remove the uneccessary comptutations 
-    #    (both for tokens that aren't in the window, and for tokens that correspond to padding according to the 'padding mask').
-    # Aside from these two rules, you are free to implement the function as you wish. 
-    # ====== YOUR CODE: ======
-    raise NotImplementedError()
-    # ========================
+    # m.k said it's ok to use loop 
+    rows_idx = []
+    cols_idx = []
+    for i in range(seq_len):
+        start = max(0, i - w)
+        end = min(seq_len, i + w + 1)
+        rows_idx.extend([i] * (end - start ))
+        cols_idx.extend(range(start, end))
+    
+    b[:, rows_idx, cols_idx] = (q[:, rows_idx, :] * k[:, cols_idx, :]).sum(-1)
+        
+    if padding_mask is not None:
+        padding_mask = padding_mask.reshape((batch_size,seq_len,1)).repeat((num_heads,1,seq_len))
+        b.masked_fill_(padding_mask == 0, minus_inf)
+        b.masked_fill_(padding_mask.transpose(-1,-2) == 0, minus_inf)
 
+    attention = nn.functional.softmax(b / (embed_dim ** 0.5), dim=-1)
+    
+    if num_heads > 1:
+        attention = attention.reshape((batch_size, num_heads, seq_len, seq_len))
+
+    values = torch.matmul(attention, v)
 
     return values, attention
-
 
 
 class MultiHeadAttention(nn.Module):
@@ -76,13 +95,8 @@ class MultiHeadAttention(nn.Module):
         
         q, k, v = qkv.chunk(3, dim=-1) #[Batch, Head, SeqLen, Dims]
         
-        # Determine value outputs
-        # TODO:
-        # call the sliding window attention function you implemented
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
-
+        values, attention = sliding_window_attention(q, k, v, self.window_size, padding_mask)
+        
         values = values.permute(0, 2, 1, 3) # [Batch, SeqLen, Head, Dims]
         values = values.reshape(batch_size, seq_length, embed_dim) #concatination of all heads
         o = self.o_proj(values)
@@ -155,16 +169,16 @@ class EncoderLayer(nn.Module):
         :param padding_mask: the padding mask of shape [Batch, SeqLen]
         :return: the output of the layer of shape [Batch, SeqLen, Dims]
         '''
-        # TODO:
-        #   To implement the encoder layer, do the following:
-        #   1) Apply attention to the input x, and then apply dropout.
-        #   2) Add a residual connection from the original input and normalize.
-        #   3) Apply a feed-forward layer to the output of step 2, and then apply dropout again.
-        #   4) Add a second residual connection and normalize again.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        padding_mask = padding_mask.to(x.device)
+        #print(x.device)
+        a = self.dropout(self.self_attn(x, padding_mask))
         
+        x = self.norm1(x + a)
+
+        pff = self.dropout(self.feed_forward(x))
+
+        x = self.norm2(x + pff)
+
         return x
     
     
@@ -201,23 +215,16 @@ class Encoder(nn.Module):
         :param padding mask #[Batch, max_seq_len]
         :return: the logits  [Batch]
         '''
-        output = None
-
-        # TODO:
-        #  Implement the forward pass of the encoder.
-        #  1) Apply the embedding layer to the input.
-        #  2) Apply positional encoding to the output of step 1.
-        #  3) Apply a dropout layer to the output of the positional encoding.
-        #  4) Apply the specified number of encoder layers.
-        #  5) Apply the classification MLP to the output vector corresponding to the special token [CLS] 
-        #     (always the first token) to receive the logits.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        #print(device)
+        output = self.encoder_embedding(sentence)
+        output = self.positional_encoding(output)
+        output = self.dropout(output)
+        for layer in self.encoder_layers:
+            output = layer(output, padding_mask)
         
-        # ========================
+        output = self.classification_mlp(output[:,0])
         
-        
-        return output  
+        return output
     
     def predict(self, sentence, padding_mask):
         '''

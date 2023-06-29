@@ -97,7 +97,13 @@ class Trainer(abc.ABC):
             if best_acc is None or test_result.accuracy > best_acc:
                 save_checkpoint = True
                 best_acc = test_result.accuracy
-                
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+
+            if epochs_without_improvement == early_stopping:
+                break
+    
             # Save model checkpoint if requested
             if save_checkpoint and checkpoint_filename is not None:
                 saved_state = dict(
@@ -293,15 +299,14 @@ class TransformerEncoderTrainer(Trainer):
         attention_mask = batch['attention_mask'].float().to(self.device)
         label = batch['label'].float().to(self.device)
         
-        loss = None
-        num_correct = None
-        # TODO:
-        #  fill out the training loop.
-        # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        y = self.model(input_ids, attention_mask).squeeze(-1)
+        pred = (y > 0.5).float()
         
-        
+        loss = self.loss_fn(y, label)
+        num_correct = (pred == label).sum()
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
         
         return BatchResult(loss.item(), num_correct.item())
         
@@ -310,20 +315,14 @@ class TransformerEncoderTrainer(Trainer):
             input_ids = batch['input_ids'].to(self.device)
             attention_mask = batch['attention_mask'].float().to(self.device)
             label = batch['label'].float().to(self.device)
-            
-            loss = None
-            num_correct = None
-            
-            # TODO:
-            #  fill out the testing loop.
-            # ====== YOUR CODE: ======
-            raise NotImplementedError()
-            # ========================
+                        
+            y = self.model(input_ids, attention_mask).squeeze(-1)
+            pred = (y > 0.5).float()
 
-            
+            loss = self.loss_fn(y, label)
+            num_correct = (pred == label).sum()
         
         return BatchResult(loss.item(), num_correct.item())
-
 
 
 class FineTuningTrainer(Trainer):
