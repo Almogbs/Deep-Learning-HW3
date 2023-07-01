@@ -24,34 +24,34 @@ def sliding_window_attention(q, k, v, window_size, padding_mask=None):
     batch_size = q.shape[0]
     num_heads = q.shape[1]
     minus_inf = -9e15
-    w = window_size // 2
 
     if len(q.shape) > 3:
         k = k.reshape((batch_size * num_heads, seq_len, embed_dim))
         q = q.reshape((batch_size * num_heads, seq_len, embed_dim))
     else:
         num_heads = 1
-    
+
     b = torch.full((batch_size * num_heads, seq_len, seq_len), minus_inf).to(q.device)
 
-    # m.k said it's ok to use loop 
+    # m.k said it's ok to use loop
+    w = window_size // 2
     rows_idx = []
     cols_idx = []
     for i in range(seq_len):
         start = max(0, i - w)
         end = min(seq_len, i + w + 1)
-        rows_idx.extend([i] * (end - start ))
+        rows_idx.extend([i] * (end - start))
         cols_idx.extend(range(start, end))
     
     b[:, rows_idx, cols_idx] = (q[:, rows_idx, :] * k[:, cols_idx, :]).sum(-1)
-        
+
     if padding_mask is not None:
         padding_mask = padding_mask.reshape((batch_size,seq_len,1)).repeat((num_heads,1,seq_len))
         b.masked_fill_(padding_mask == 0, minus_inf)
         b.masked_fill_(padding_mask.transpose(-1,-2) == 0, minus_inf)
 
-    attention = nn.functional.softmax(b / (embed_dim ** 0.5), dim=-1)
-    
+    attention = nn.functional.softmax(b / math.sqrt(embed_dim), dim=-1)
+
     if num_heads > 1:
         attention = attention.reshape((batch_size, num_heads, seq_len, seq_len))
 
