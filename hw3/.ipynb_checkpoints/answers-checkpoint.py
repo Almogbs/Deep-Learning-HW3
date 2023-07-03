@@ -132,9 +132,9 @@ def part3_transformer_encoder_hyperparams():
     hypers = dict(
         embed_dim = 256, 
         num_heads = 4,
-        num_layers = 8,
+        num_layers = 5,
         hidden_dim = 64,
-        window_size = 8,
+        window_size = 20,
         droupout = 0.1,
         lr=0.0001,
     )
@@ -145,20 +145,18 @@ def part3_transformer_encoder_hyperparams():
 
 
 part3_q1 = r"""
-**Your answer:**
-
+In multi-layer CNN, the first layer uses adjacent info (like pixels) in order to produce the input to the next layer which contain dependencies of this local info, while each next layer does the same, the 'radius' of this local info get bigger and able to find depedencies in much larger context. The sliding window attention does the same in the way that the first layer we only look at the adjacent tokens and we widden are context in each layer.
 """
 
 part3_q2 = r"""
-**Your answer:**
-
-
+For example, we can look at the Global attention method provided in the paper, which suggests to choose group of special keys, that depends on the data and observations of it, and only for them, when we compute the sliding window attention, we will *not* bound the context of the window, while for the other keys, we will comute in the regular way.
+We can also take into account this special keys when we comute the attention values of every keys, regardless of its proximity to the special keys. 
+Notice that the complexity remains the same, as we only added limited additional computations in each activation of the sliding windows.
 """
 
 
 part4_q1 = r"""
 **Your answer:**
-
 
 """
 
