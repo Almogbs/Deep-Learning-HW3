@@ -330,13 +330,20 @@ class FineTuningTrainer(Trainer):
     def train_batch(self, batch) -> BatchResult:
         
         input_ids = batch["input_ids"].to(self.device)
-        attention_masks = batch["attention_mask"]
-        labels= batch["label"]
+        attention_masks = batch["attention_mask"].to(self.device)
+        labels= batch["label"].to(self.device)
         # TODO:
         #  fill out the training loop.
         # ====== YOUR CODE: ======
-
-        raise NotImplementedError()
+        y = self.model(input_ids, attention_mask=attention_masks, labels=labels)
+        # loss = self.loss_fn(y, labels)
+        loss = y.loss
+        logits = y.logits
+        pred = torch.argmax(logits, dim=1)
+        num_correct = (pred == labels).sum()
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
         
         # ========================
         
@@ -345,13 +352,23 @@ class FineTuningTrainer(Trainer):
     def test_batch(self, batch) -> BatchResult:
         
         input_ids = batch["input_ids"].to(self.device)
-        attention_masks = batch["attention_mask"]
-        labels= batch["label"]
+        attention_masks = batch["attention_mask"].to(self.device)
+        labels= batch["label"].to(self.device)
         
         with torch.no_grad():
             # TODO:
             #  fill out the training loop.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            y = self.model(input_ids, attention_mask=attention_masks, labels=labels)
+            # loss = self.loss_fn(y, labels)
+            loss = y.loss
+            logits = y.logits
+            pred = torch.argmax(logits, dim=1)
+            num_correct = (pred == labels).sum()
+            
             # ========================
         return BatchResult(loss, num_correct)
+
+
+
+
